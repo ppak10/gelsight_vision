@@ -3,9 +3,9 @@
 <package format="3">
   <name>gelsight_vision</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="ppak@todo.todo">ppak</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Manages movement of Gelsight and D555 Realsense camera</description>
+  <maintainer email="ppak10@gmail.com">ppak10</maintainer>
+  <license>MIT</license>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

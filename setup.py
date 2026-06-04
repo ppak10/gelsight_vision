@@ -14,9 +14,9 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='ppak',
-    maintainer_email='ppak@todo.todo',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer_email='ppak10@gmail.com',
+    description='Manages Gelsight and vision from D555 Realsense camera',
+    license='MIT',
     extras_require={
         'test': [
             'pytest',
@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pose_goal_example = gelsight_vision.pose_goal_example:main'
+            'pose_goal_example = gelsight_vision.pose_goal_example:main',
+            'move_camera_focus = gelsight_vision.move_camera_focus:main'
         ],
     },
 )

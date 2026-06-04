@@ -1,4 +1,5 @@
 import rclpy
+from robot_manager_interfaces.srv import Home 
 from rclpy.node import Node
 from rclpy.action.client import ActionClient
 from action_msgs.msg import GoalStatus
@@ -10,6 +11,8 @@ import math
 from robot_manager_interfaces.action import PoseGoal
 from geometry_msgs.msg import Pose, Point, Quaternion
 from tf_transformations import quaternion_from_euler
+from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
+from geometry_msgs.msg import TransformStamped, Transform
 
 class PoseGoalExample(Node):
     def __init__(self):
@@ -20,6 +23,25 @@ class PoseGoalExample(Node):
         
         self.pose_goal_client = ActionClient(self, PoseGoal, self.ns + "pose_goal")
         self.pose_goal_client.wait_for_server()
+
+        self.home_client = self.create_client(Home, self.ns + "home")
+
+        while not self.home_client.wait_for_service():
+            continue
+
+        # Creates transform for visual 
+        self.tf_static_broadcaster = StaticTransformBroadcaster(self)
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "world"
+        t.child_frame_id = "plate"
+        t.transform = Transform()
+        t.transform.translation.x = 0.05
+        t.transform.translation.y = -0.25
+        t.transform.translation.z = 0.05
+        q = quaternion_from_euler(math.radians(20.0), math.radians(0.0), math.radians(0.0))
+        t.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
+        self.tf_static_broadcaster.sendTransform(t)
 
     def run_action(self, action_client: ActionClient, goal_msg, show_progress = False):
         if show_progress:
@@ -39,6 +61,10 @@ def main(args=None):
     spin_thread.start()
 
     try:
+        request = Home.Request()
+        request.speed = 0.3
+        node.home_client.call(request)
+
         # Create Goal
         goal_msg = PoseGoal.Goal()
         q = quaternion_from_euler(math.radians(0), math.radians(0), math.radians(0))
@@ -48,7 +74,7 @@ def main(args=None):
                 )
         goal_msg.velocity_scaling = 0.2
         goal_msg.acceleration_scaling = 0.1
-        goal_msg.frame_id = "world" # Can be any frame. If empty -> base_link used
+        goal_msg.frame_id = "plate" # Can be any frame. If empty -> base_link used
         goal_msg.target_id = "ur20_tc_master" # Can be any child of tool0. If empty -> tool0 used
         goal_msg.method = "PTP" # Point-to-Point
 
