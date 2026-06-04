@@ -39,7 +39,7 @@ class PoseGoalExample(Node):
         t.transform.translation.x = 0.05
         t.transform.translation.y = -0.25
         t.transform.translation.z = 0.05
-        q = quaternion_from_euler(math.radians(20.0), math.radians(0.0), math.radians(0.0))
+        q = quaternion_from_euler(math.radians(-20.0), math.radians(0.0), math.radians(0.0))
         t.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
         self.tf_static_broadcaster.sendTransform(t)
 

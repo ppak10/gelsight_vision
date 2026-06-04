@@ -25,7 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'pose_goal_example = gelsight_vision.pose_goal_example:main',
-            'move_camera_focus = gelsight_vision.move_camera_focus:main'
+            'move_camera_focus = gelsight_vision.move_camera_focus:main',
+            'touch_with_gelsight = gelsight_vision.touch_with_gelsight:main'
         ],
     },
 )

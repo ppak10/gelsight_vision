@@ -2,6 +2,7 @@ import math
 import rclpy
 import threading
 
+from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import Pose, Point, Quaternion
 from rclpy.action.client import ActionClient
 from rclpy.node import Node
@@ -15,7 +16,9 @@ class MoveCameraFocus(Node):
 
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
+        _ = self.declare_parameter('frame_id', 'plate')
         self.ns: str = str(self.get_parameter('ns').value)
+        self.frame_id: str = str(self.get_parameter('frame_id').value)
 
         self.pose_goal_client: ActionClient = ActionClient(
             self,
@@ -35,11 +38,21 @@ class MoveCameraFocus(Node):
             goal_msg,
             show_progress: bool = False
         ):
+
+        feedback_callback = lambda msg: self.get_logger().info(
+            f'Progress: {msg.feedback.progress:.1f}%'
+        )
+
         if show_progress:
-            result = action_client.send_goal(goal_msg, feedback_callback=lambda msg: self.get_logger().info(f'Progress: {msg.feedback.progress:.1f}%'))
+            result = action_client.send_goal(
+                goal_msg,
+                feedback_callback=feedback_callback
+            )
         else:
             result = action_client.send_goal(goal_msg)
+
         status = result.status
+
         if status != GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().error(result.result.message)
             exit(1)
@@ -65,17 +78,17 @@ def main(args=None):
         # Create pose goal for moving camera focus
         goal_msg = PoseGoal.Goal()
         q = quaternion_from_euler(
-            math.radians(20.0),
+            math.radians(0.0),
             math.radians(0.0),
             math.radians(0.0)
         )
         goal_msg.target_pose = Pose(
-            position=Point(x=0.0, y=0.0, z=0.1),
+            position=Point(x=0.0, y=0.0, z=0.0),
             orientation=Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
         )
         goal_msg.velocity_scaling = 0.2
         goal_msg.acceleration_scaling = 0.1
-        goal_msg.frame_id = "plate" # Can be any frame. If empty -> base_link used
+        goal_msg.frame_id = node.frame_id
         goal_msg.target_id = "camera_focus" # Can be any child of tool0. If empty -> tool0 used
         goal_msg.method = "PTP" # Point-to-Point
 
