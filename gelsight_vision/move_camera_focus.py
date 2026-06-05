@@ -17,8 +17,10 @@ class MoveCameraFocus(Node):
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
         _ = self.declare_parameter('frame_id', 'plate')
+        _ = self.declare_parameter('home', False)
         self.ns: str = str(self.get_parameter('ns').value)
         self.frame_id: str = str(self.get_parameter('frame_id').value)
+        self.home: bool = bool(self.get_parameter('home').value)
 
         self.pose_goal_client: ActionClient = ActionClient(
             self,
@@ -71,9 +73,10 @@ def main(args=None):
 
     try:
         # Send request to home robot arm
-        request = Home.Request()
-        request.speed = 0.25
-        node.home_client.call(request)
+        if node.home:
+            request = Home.Request()
+            request.speed = 0.25
+            node.home_client.call(request)
 
         # Create pose goal for moving camera focus
         goal_msg = PoseGoal.Goal()

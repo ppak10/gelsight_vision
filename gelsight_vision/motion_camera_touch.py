@@ -12,23 +12,20 @@ from robot_manager_interfaces.action import PoseGoal
 from robot_manager_interfaces.srv import Home
 from tf_transformations import quaternion_from_euler
 
-
-class TouchWithGelsight(Node):
+class MoveCameraFocus(Node):
     def __init__(self):
-        super().__init__('touch_with_gelsight')
+        super().__init__('move_camera_focus')
 
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
         _ = self.declare_parameter('frame_id', 'plate')
         _ = self.declare_parameter('force_max', 4.0)
         _ = self.declare_parameter('mock', True)
-        _ = self.declare_parameter('home', False)
 
         self.ns: str = str(self.get_parameter('ns').value)
         self.frame_id: str = str(self.get_parameter('frame_id').value)
         self.force_max: float = float(self.get_parameter('force_max').value)
         self.mock: bool = bool(self.get_parameter('mock').value)
-        self.home: bool = bool(self.get_parameter('home').value)
 
         # Force values
         self.force = 0.0
@@ -99,7 +96,8 @@ class TouchWithGelsight(Node):
         self.offset = 0.0
         data = []
         time.sleep(0.1)
-        for _ in range(500):
+
+        for _ in range(100):
             data.append(self.force)
             time.sleep(0.01)
         self.offset = sum(data) / len(data)
@@ -131,10 +129,9 @@ class TouchWithGelsight(Node):
             self.get_logger().error(result.result.message)
             exit(1)
 
-
 def main(args=None):
     rclpy.init(args=args)
-    node = TouchWithGelsight()
+    node = MoveCameraFocus()
 
     spin_thread = threading.Thread(
         target=rclpy.spin,
@@ -145,12 +142,11 @@ def main(args=None):
 
     try:
         # Send request to home robot arm
-        if node.home:
-            request = Home.Request()
-            request.speed = 0.25
-            node.home_client.call(request)
+        request = Home.Request()
+        request.speed = 0.1
+        node.home_client.call(request)
 
-        # Create pose goal for gelsight tooltip 
+        # Create pose goal for moving camera focus
         goal_msg = PoseGoal.Goal()
         q = quaternion_from_euler(
             math.radians(0.0),
@@ -158,19 +154,49 @@ def main(args=None):
             math.radians(0.0)
         )
         goal_msg.target_pose = Pose(
-            position=Point(x=0.0, y=0.0, z=0.1),
+            position=Point(x=0.0, y=0.0, z=0.0),
             orientation=Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
         )
-        goal_msg.velocity_scaling = 0.2
+        goal_msg.velocity_scaling = 0.1
         goal_msg.acceleration_scaling = 0.1
         goal_msg.frame_id = node.frame_id
-        goal_msg.target_id = "gelsight_tooltip"
+        goal_msg.target_id = "camera_focus" # Can be any child of tool0. If empty -> tool0 used
         goal_msg.method = "PTP" # Point-to-Point
 
         # Execute pose goal 
-        _ = node.get_logger().info("Moving Gelsight Tooltip into Position")
+        _ = node.get_logger().info("Moving Camera Focus")
         _ = node.run_action(node.pose_goal_client, goal_msg)
+        _ = node.get_logger().info("Finished Moving Camera Focus")
+
+        # Mock realsense picture take
+        time.sleep(2.0)
+
+        # input("Press any key to continue")
+
+        # Create pose goal for gelsight tooltip 
+        gelsight_goal_msg = PoseGoal.Goal()
+        gelsight_q = quaternion_from_euler(
+            math.radians(0.0),
+            math.radians(0.0),
+            math.radians(0.0)
+        )
+        gelsight_goal_msg.target_pose = Pose(
+            position=Point(x=0.0, y=0.0, z=0.1),
+            orientation=Quaternion(x=gelsight_q[0], y=gelsight_q[1], z=gelsight_q[2], w=gelsight_q[3])
+        )
+
+        gelsight_goal_msg.velocity_scaling = 0.1
+        gelsight_goal_msg.acceleration_scaling = 0.1
+        gelsight_goal_msg.frame_id = node.frame_id
+        gelsight_goal_msg.target_id = "gelsight_tooltip"
+        gelsight_goal_msg.method = "PTP" # Point-to-Point
+
+        # Execute pose goal 
+        _ = node.get_logger().info("Moving Gelsight Tooltip into Position")
+        _ = node.run_action(node.pose_goal_client, gelsight_goal_msg)
         _ = node.get_logger().info("Finished Moving Gelsight Tooltip into Position")
+
+        # input("Press any key to continue")
 
         node.calibrate_sensor()
 
@@ -184,8 +210,27 @@ def main(args=None):
                 print(node.force)
                 if node.force >= node.force_max:
                     node.stop()
-                    return
+                    break
+
                 time.sleep(0.005)
+
+        # Mock gelsight picture take
+        time.sleep(2.0)
+
+        # Wait for pose action server to be available.
+        time.sleep(0.1)
+
+        # input("Press any key to continue")
+        # Execute pose goal 
+        _ = node.get_logger().info("Moving Camera Focus")
+        _ = node.run_action(node.pose_goal_client, goal_msg)
+        _ = node.get_logger().info("Finished Moving Camera Focus")
+
+        # input("Press any key to continue")
+        # Send request to home robot arm
+        request = Home.Request()
+        request.speed = 0.1
+        node.home_client.call(request)
 
     except KeyboardInterrupt:
         _ = node.get_logger().info("Script interrupted by user.")
