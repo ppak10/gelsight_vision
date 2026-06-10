@@ -1,10 +1,11 @@
-import math
 import rclpy
 import threading
 import time
 
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import Pose, Point, Quaternion, TwistStamped, WrenchStamped
+from gelsight_vision.gelsight.touch import touch
+from math import radians
 from moveit_msgs.srv import ServoCommandType
 from rclpy.action.client import ActionClient
 from rclpy.node import Node
@@ -12,20 +13,24 @@ from robot_manager_interfaces.action import PoseGoal
 from robot_manager_interfaces.srv import Home
 from tf_transformations import quaternion_from_euler
 
-class MoveCameraFocus(Node):
+class MotionCameraTouch(Node):
     def __init__(self):
-        super().__init__('move_camera_focus')
+        super().__init__('motion_camera_touch')
 
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
         _ = self.declare_parameter('frame_id', 'plate')
         _ = self.declare_parameter('force_max', 4.0)
         _ = self.declare_parameter('mock', True)
+        _ = self.declare_parameter('touch_x', 1)
+        _ = self.declare_parameter('touch_y', 1)
 
         self.ns: str = str(self.get_parameter('ns').value)
         self.frame_id: str = str(self.get_parameter('frame_id').value)
         self.force_max: float = float(self.get_parameter('force_max').value)
         self.mock: bool = bool(self.get_parameter('mock').value)
+        self.touch_x: int = int(self.get_parameter('touch_x').value)
+        self.touch_y: int = int(self.get_parameter('touch_y').value)
 
         # Force values
         self.force = 0.0
@@ -131,7 +136,7 @@ class MoveCameraFocus(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MoveCameraFocus()
+    node = MotionCameraTouch()
 
     spin_thread = threading.Thread(
         target=rclpy.spin,
@@ -146,13 +151,11 @@ def main(args=None):
         request.speed = 0.1
         node.home_client.call(request)
 
+        q = quaternion_from_euler(radians(0.0), radians(0.0), radians(0.0))
+
         # Create pose goal for moving camera focus
         goal_msg = PoseGoal.Goal()
-        q = quaternion_from_euler(
-            math.radians(0.0),
-            math.radians(0.0),
-            math.radians(0.0)
-        )
+
         goal_msg.target_pose = Pose(
             position=Point(x=0.0, y=0.0, z=0.0),
             orientation=Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
@@ -173,52 +176,32 @@ def main(args=None):
 
         # input("Press any key to continue")
 
-        # Create pose goal for gelsight tooltip 
-        gelsight_goal_msg = PoseGoal.Goal()
-        gelsight_q = quaternion_from_euler(
-            math.radians(0.0),
-            math.radians(0.0),
-            math.radians(0.0)
-        )
-        gelsight_goal_msg.target_pose = Pose(
-            position=Point(x=0.0, y=0.0, z=0.1),
-            orientation=Quaternion(x=gelsight_q[0], y=gelsight_q[1], z=gelsight_q[2], w=gelsight_q[3])
-        )
+        q = quaternion_from_euler(radians(0.0), radians(0.0), radians(0.0))
+        orientation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
 
-        gelsight_goal_msg.velocity_scaling = 0.1
-        gelsight_goal_msg.acceleration_scaling = 0.1
-        gelsight_goal_msg.frame_id = node.frame_id
-        gelsight_goal_msg.target_id = "gelsight_tooltip"
-        gelsight_goal_msg.method = "PTP" # Point-to-Point
+        gelsight_width = 0.025
+        gelsight_height = 0.05
 
-        # Execute pose goal 
-        _ = node.get_logger().info("Moving Gelsight Tooltip into Position")
-        _ = node.run_action(node.pose_goal_client, gelsight_goal_msg)
-        _ = node.get_logger().info("Finished Moving Gelsight Tooltip into Position")
+        i_mid = (node.touch_x // 2)
+        j_mid = (node.touch_y // 2)
 
-        # input("Press any key to continue")
+        print(f"i_mid: {i_mid}, j_mid: {j_mid}")
 
-        node.calibrate_sensor()
+        for i in range(node.touch_x, 0, -1):
+            x = (-i_mid + i) * gelsight_width 
 
-        if node.mock:
-            for i in range(1000):
-                node.move_z(-0.02)
-                time.sleep(0.005)
-        else:
-            while True:
-                node.move_z(-0.02)
-                print(node.force)
-                if node.force >= node.force_max:
-                    node.stop()
-                    break
+            for j in range(node.touch_y, 0, -1):
+                y = (-j_mid + j) * gelsight_height
 
-                time.sleep(0.005)
 
-        # Mock gelsight picture take
-        time.sleep(2.0)
-
-        # Wait for pose action server to be available.
-        time.sleep(0.1)
+                print(f"i: {i}, j: {j}, x: {x}, y: {y}")
+                touch(
+                    node=node,
+                    frame_id=node.frame_id,
+                    mock=node.mock,
+                    position=Point(x=x, y=y, z=0.05),
+                    orientation=orientation,
+                )
 
         # input("Press any key to continue")
         # Execute pose goal 

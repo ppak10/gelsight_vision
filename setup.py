@@ -28,7 +28,9 @@ setup(
             'move_camera_focus = gelsight_vision.move_camera_focus:main',
             'motion_camera_touch = gelsight_vision.motion_camera_touch:main',
             'set_plate = gelsight_vision.set_plate:main',
-            'touch_with_gelsight = gelsight_vision.touch_with_gelsight:main'
+            'touch_with_gelsight = gelsight_vision.touch_with_gelsight:main',
+            'publisher = gelsight_ros.gelsight_publisher:main',
+            'subscriber = gelsight_ros.gelsight_subscriber:main'
         ],
     },
 )
