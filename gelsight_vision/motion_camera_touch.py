@@ -1,14 +1,22 @@
+import os
+import cv2
+import numpy as np
 import rclpy
 import threading
 import time
 
+from datetime import datetime
 from action_msgs.msg import GoalStatus
+from cv_bridge import CvBridge
 from geometry_msgs.msg import Pose, Point, Quaternion, TwistStamped, WrenchStamped
+from gelsight_vision.gelsight.height_map import HeightMapper, save_height_preview
+from gelsight_vision.gelsight.stitch import stitch_session
 from gelsight_vision.gelsight.touch import touch
 from math import radians
 from moveit_msgs.srv import ServoCommandType
 from rclpy.action.client import ActionClient
 from rclpy.node import Node
+from sensor_msgs.msg import Image
 from robot_manager_interfaces.action import PoseGoal
 from robot_manager_interfaces.srv import Home
 from tf_transformations import quaternion_from_euler
@@ -21,9 +29,13 @@ class MotionCameraTouch(Node):
         _ = self.declare_parameter('ns', 'ur20')
         _ = self.declare_parameter('frame_id', 'plate')
         _ = self.declare_parameter('force_max', 4.0)
-        _ = self.declare_parameter('mock', True)
+        _ = self.declare_parameter('mock', False)
         _ = self.declare_parameter('touch_x', 1)
         _ = self.declare_parameter('touch_y', 1)
+        _ = self.declare_parameter(
+            'capture_root',
+            '/home/ppak/ros2_ws/src/gelsight_vision/captures',
+        )
 
         self.ns: str = str(self.get_parameter('ns').value)
         self.frame_id: str = str(self.get_parameter('frame_id').value)
@@ -32,9 +44,27 @@ class MotionCameraTouch(Node):
         self.touch_x: int = int(self.get_parameter('touch_x').value)
         self.touch_y: int = int(self.get_parameter('touch_y').value)
 
+        self.gelsight_frame = None
+        self.d555_frame = None
+
         # Force values
         self.force = 0.0
         self.offset = 0.0
+
+        # Capture image flags
+        self.gelsight_capture_image = False
+        self.gelsight_calibrate = False
+        self.d555_capture_image = False
+
+        # Shared session folder for captured frames
+        capture_root = str(self.get_parameter('capture_root').value)
+        session = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.capture_dir = os.path.join(capture_root, session)
+        os.makedirs(self.capture_dir, exist_ok=True)
+        self.gelsight_capture_count = 0
+        self.d555_capture_count = 0
+
+        self.height_mapper = HeightMapper()
 
         self.pose_goal_client: ActionClient = ActionClient(
             self,
@@ -46,13 +76,34 @@ class MotionCameraTouch(Node):
         self.home_client = self.create_client(Home, self.ns + "/" + "home")
 
         while not self.home_client.wait_for_service():
+            sleep(1.0)
+            print("waiting for service")
             continue
 
         # Force Subscriber
         self.force_subscriber = self.create_subscription(
             WrenchStamped, 
-            self.ns + '/force_torque_sensor_broadcaster/wrench_filtered',
+            # self.ns + '/force_torque_sensor_broadcaster/wrench_filtered',
+            self.ns + '/wrench',
             self.force_callback, 
+            10
+        )
+
+        self.cv_bridge = CvBridge()
+
+        # Gelsight Subscriber
+        self.gelsight_subscriber = self.create_subscription(
+            Image,
+            'gelsight_capture/image',
+            self.gelsight_listener_callback,
+            10
+        )
+
+        # D555 Subscriber
+        self.d555_subscriber = self.create_subscription(
+            Image,
+            'gelsight_vision_d555/color/image_raw',
+            self.d555_listener_callback,
             10
         )
 
@@ -71,6 +122,43 @@ class MotionCameraTouch(Node):
         req.command_type = ServoCommandType.Request.TWIST
         future = self.servo_client.call_async(req)
         rclpy.spin_until_future_complete(self, future)
+
+    def gelsight_listener_callback(self, msg):
+        if self.gelsight_calibrate:
+            frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            baseline_path = os.path.join(self.capture_dir, "gelsight_baseline.png")
+            cv2.imwrite(baseline_path, frame)
+            self.height_mapper.calibrate(frame)
+            print(f"gelsight baseline -> {baseline_path}")
+            self.gelsight_calibrate = False
+            return
+        if self.gelsight_capture_image:
+            self.gelsight_frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            self.gelsight_capture_count += 1
+            stem = f"gelsight_{self.gelsight_capture_count:04d}"
+            img_path = os.path.join(self.capture_dir, f"{stem}.png")
+            depth_path = os.path.join(self.capture_dir, f"{stem}_depth.npy")
+            preview_path = os.path.join(self.capture_dir, f"{stem}_depth_preview.png")
+            cv2.imwrite(img_path, self.gelsight_frame)
+            height = self.height_mapper.image_to_height_tensor(self.gelsight_frame).numpy()
+            np.save(depth_path, height)
+            save_height_preview(height, preview_path)
+            print(f"gelsight captured frame -> {img_path}")
+            print(f"gelsight depth -> {depth_path}")
+            print(f"gelsight depth preview -> {preview_path}")
+            self.gelsight_capture_image = False
+
+    def d555_listener_callback(self, msg):
+        if self.d555_capture_image:
+            self.d555_frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            self.d555_capture_count += 1
+            path = os.path.join(
+                self.capture_dir,
+                f"d555_{self.d555_capture_count:04d}.png"
+            )
+            cv2.imwrite(path, self.d555_frame)
+            print(f"d555 captured frame -> {path}")
+            self.d555_capture_image = False
 
     #### Movement
     def move_z(self, speed):
@@ -146,6 +234,13 @@ def main(args=None):
     spin_thread.start()
 
     try:
+        # Capture an untouched-gel frame to calibrate the HeightMapper baseline.
+        node.get_logger().info("Capturing gelsight baseline frame for calibration...")
+        node.gelsight_calibrate = True
+        while node.gelsight_calibrate:
+            time.sleep(0.1)
+        node.get_logger().info("Gelsight baseline captured and calibrated.")
+
         # Send request to home robot arm
         request = Home.Request()
         request.speed = 0.1
@@ -171,7 +266,10 @@ def main(args=None):
         _ = node.run_action(node.pose_goal_client, goal_msg)
         _ = node.get_logger().info("Finished Moving Camera Focus")
 
-        # Mock realsense picture take
+        time.sleep(2.0)
+        # Realsense picture take
+        node.d555_capture_image = True
+
         time.sleep(2.0)
 
         # input("Press any key to continue")
@@ -179,8 +277,10 @@ def main(args=None):
         q = quaternion_from_euler(radians(0.0), radians(0.0), radians(0.0))
         orientation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
 
-        gelsight_width = 0.025
-        gelsight_height = 0.05
+        gelsight_width = 0.020
+        # gelsight_width = 0.015
+        gelsight_height = 0.015
+        # gelsight_height = 0.020
 
         i_mid = (node.touch_x // 2)
         j_mid = (node.touch_y // 2)
@@ -199,12 +299,19 @@ def main(args=None):
                     node=node,
                     frame_id=node.frame_id,
                     mock=node.mock,
-                    position=Point(x=x, y=y, z=0.05),
+                    position=Point(x=x, y=y, z=0.02),
                     orientation=orientation,
                 )
 
+        _ = node.get_logger().info("Stitching session captures...")
+        stitch_session(
+            session_dir=node.capture_dir,
+            touch_x=node.touch_x,
+            touch_y=node.touch_y,
+        )
+
         # input("Press any key to continue")
-        # Execute pose goal 
+        # Execute pose goal
         _ = node.get_logger().info("Moving Camera Focus")
         _ = node.run_action(node.pose_goal_client, goal_msg)
         _ = node.get_logger().info("Finished Moving Camera Focus")

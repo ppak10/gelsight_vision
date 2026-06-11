@@ -1,0 +1,3 @@
+[submodule "githubs/gsrobotics"]
+	path = githubs/gsrobotics
+	url = https://github.com/gelsightinc/gsrobotics.git

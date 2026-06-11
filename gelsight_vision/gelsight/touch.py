@@ -12,7 +12,7 @@ def touch(
     mock: bool,
     position: Point,
     orientation: Quaternion,
-    dz: float = -0.05,
+    dz: float = -0.025,
     force_max: float = 4.0,
 ):
     gelsight_goal_msg = PoseGoal.Goal()
@@ -42,11 +42,15 @@ def touch(
             if node.force >= force_max:
                 node.stop()
                 break
+            time.sleep(0.002)
     
-            time.sleep(0.005)
+    time.sleep(2.0)
 
-    # Mock gelsight picture take
-    time.sleep(1.0)
+    # Gelsight picture take
+    node.gelsight_capture_image = True
+
+    while node.gelsight_capture_image:
+        time.sleep(0.1)
 
     # Wait for pose action server to be available.
     time.sleep(0.1)
