@@ -6,6 +6,10 @@ setup(
     name=package_name,
     version='0.0.0',
     packages=find_packages(exclude=['test']),
+    package_data={
+        'gelsight_vision.gsrobotics': ['models/*.pt', 'LICENSE'],
+    },
+    include_package_data=True,
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -27,6 +31,7 @@ setup(
             'pose_goal_example = gelsight_vision.pose_goal_example:main',
             'move_camera_focus = gelsight_vision.move_camera_focus:main',
             'motion_camera_touch = gelsight_vision.motion_camera_touch:main',
+            'motion_visuo_tactile_pipeline = gelsight_vision.motion_visuo_tactile_pipeline:main',
             'set_plate = gelsight_vision.set_plate:main',
             'touch_with_gelsight = gelsight_vision.touch_with_gelsight:main',
             'publisher = gelsight_ros.gelsight_publisher:main',

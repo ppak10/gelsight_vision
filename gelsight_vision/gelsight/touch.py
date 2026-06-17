@@ -30,6 +30,7 @@ def touch(
     _ = node.get_logger().info("Finished Moving Gelsight Tooltip into Position")
     
     node.calibrate_sensor()
+
     
     if mock:
         for i in range(1000):
@@ -52,7 +53,7 @@ def touch(
     while node.gelsight_capture_image:
         time.sleep(0.1)
 
-    # Wait for pose action server to be available.
+    # Wait for pose aiction server to be available.
     time.sleep(0.1)
 
     # Move gelsight tooltip back above sample

@@ -21,9 +21,9 @@ from robot_manager_interfaces.action import PoseGoal
 from robot_manager_interfaces.srv import Home
 from tf_transformations import quaternion_from_euler
 
-class MotionCameraTouch(Node):
+class MotionVisuoTactilePipeline(Node):
     def __init__(self):
-        super().__init__('motion_camera_touch')
+        super().__init__('motion_visuo_tactile_pipeline')
 
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
@@ -35,7 +35,7 @@ class MotionCameraTouch(Node):
         _ = self.declare_parameter(
             'capture_root',
             # '/home/ppak/HuggingFace/Datasets/Gelsight-Welds/source/v2',
-            '/home/ppak/ros2_ws/src/gelsight_vision/captures',
+            '/home/ppak/ros2_ws/src/gelsight_vision/captures_visuo_tactile',
         )
         # RealSense D5xx publishes /depth/image_rect_raw as 16UC1 in raw device
         # units; multiply by depth_scale (meters per raw unit) to get distance.
@@ -268,7 +268,7 @@ class MotionCameraTouch(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MotionCameraTouch()
+    node = MotionVisuoTactilePipeline()
 
     spin_thread = threading.Thread(
         target=rclpy.spin,

@@ -8,7 +8,6 @@ of the predicted normals; per the gsrobotics docs the lateral scale is
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Optional, Union
 
@@ -16,18 +15,14 @@ import cv2
 import numpy as np
 import torch
 
-_GSROBOTICS_PATH = Path(__file__).resolve().parents[2] / "githubs" / "gsrobotics"
-if str(_GSROBOTICS_PATH) not in sys.path:
-    sys.path.insert(0, str(_GSROBOTICS_PATH))
-
-from utilities.image_processing import crop_and_resize  # noqa: E402
-from utilities.reconstruction import Reconstruction3D  # noqa: E402
+from ..gsrobotics.utilities.image_processing import crop_and_resize
+from ..gsrobotics.utilities.reconstruction import Reconstruction3D
 
 DEFAULT_WIDTH = 320
 DEFAULT_HEIGHT = 240
-DEFAULT_BORDER_FRACTION = 0.15
+DEFAULT_BORDER_FRACTION = 0.25
 DEFAULT_MARKER_THRESHOLD = (0, 70)
-DEFAULT_MODEL_PATH = _GSROBOTICS_PATH / "models" / "nnmini.pt"
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "gsrobotics" / "models" / "nnmini.pt"
 
 ImageLike = Union[np.ndarray, str, Path]
 
@@ -71,6 +66,23 @@ class HeightMapper:
             image=rgb, markers_threshold=self.marker_threshold
         )
         return torch.from_numpy(depth).float()
+
+    def crop_native(self, image: np.ndarray) -> np.ndarray:
+        """Apply the same border crop the depth pipeline uses, but at the
+        image's native resolution (no resize). Use this when saving the
+        captured BGR frame so it covers the same physical area as the
+        computed depth map."""
+        return crop_and_resize(
+            image=image,
+            target_size=None,
+            border_fraction=self.border_fraction,
+        )
+
+    @property
+    def keep_fraction(self) -> float:
+        """Fraction of each axis that survives the border crop. Multiply
+        a full-sensor FOV (in mm) by this to get the cropped FOV."""
+        return 1.0 - 2.0 * self.border_fraction
 
     def _prepare(self, image: ImageLike) -> np.ndarray:
         if isinstance(image, (str, Path)):
