@@ -21,9 +21,9 @@ from robot_manager_interfaces.action import PoseGoal
 from robot_manager_interfaces.srv import Home
 from tf_transformations import quaternion_from_euler
 
-class MotionVisuoTactilePipeline(Node):
+class PipelineVisuoTactile(Node):
     def __init__(self):
-        super().__init__('motion_visuo_tactile_pipeline')
+        super().__init__('pipeline_visuo_tactile')
 
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
@@ -268,7 +268,7 @@ class MotionVisuoTactilePipeline(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MotionVisuoTactilePipeline()
+    node = PipelineVisuoTactile()
 
     spin_thread = threading.Thread(
         target=rclpy.spin,

@@ -28,14 +28,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pose_goal_example = gelsight_vision.pose_goal_example:main',
-            'move_camera_focus = gelsight_vision.move_camera_focus:main',
-            'motion_camera_touch = gelsight_vision.motion_camera_touch:main',
-            'motion_visuo_tactile_pipeline = gelsight_vision.motion_visuo_tactile_pipeline:main',
+            'motion_collect_sample = gelsight_vision.motion_collect_sample:main',
+            'pipeline_visuo_tactile = gelsight_vision.pipeline_visuo_tactile:main',
             'set_plate = gelsight_vision.set_plate:main',
-            'touch_with_gelsight = gelsight_vision.touch_with_gelsight:main',
-            'publisher = gelsight_ros.gelsight_publisher:main',
-            'subscriber = gelsight_ros.gelsight_subscriber:main'
         ],
     },
 )

@@ -21,9 +21,9 @@ from robot_manager_interfaces.action import PoseGoal
 from robot_manager_interfaces.srv import Home
 from tf_transformations import quaternion_from_euler
 
-class MotionCameraTouch(Node):
+class MotionCollectSample(Node):
     def __init__(self):
-        super().__init__('motion_camera_touch')
+        super().__init__('motion_collect_sample')
 
         # Assigns namespace to ur20
         _ = self.declare_parameter('ns', 'ur20')
@@ -268,7 +268,7 @@ class MotionCameraTouch(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MotionCameraTouch()
+    node = MotionCollectSample()
 
     spin_thread = threading.Thread(
         target=rclpy.spin,
